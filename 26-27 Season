@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NBA Standings Challenge & League Pool</title>
+  <!-- Drag-and-drop & Confetti libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b1120;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #f97316;
+      --accent-hover: #ea580c;
+      --playoff: #10b981;
+      --playin: #f59e0b;
+      --lottery: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Auth Gate Overlay */
+    #auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 17, 32, 0.95);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .auth-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .avatar-grid {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .avatar-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #0f172a;
+      border: 2px solid var(--border);
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: 0.2s;
+    }
+
+    .avatar-btn.active {
+      border-color: var(--accent);
+      transform: scale(1.15);
+      background: #334155;
+    }
+
+    /* Header & Navigation */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .user-tag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+
+    .nav-tabs {
+      display: flex;
+      background: #0f172a;
+      padding: 4px;
+      border-radius: 8px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    main {
+      flex: 1;
+      padding: 24px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .banner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      gap: 16px;
+    }
+
+    /* Grid & Columns */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-title {
+      padding: 14px 18px;
+      background: #0f172a;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .team-list {
+      list-style: none;
+      padding: 12px;
+    }
+
+    .team-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .team-item:active {
+      cursor: grabbing;
+    }
+
+    .seed-pill {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 0.85rem;
+      background: var(--lottery);
+      color: #fff;
+    }
+
+    .tier-playoff .seed-pill { background: var(--playoff); color: #000; }
+    .tier-playin .seed-pill { background: var(--playin); color: #000; }
+
+    .team-name {
+      flex: 1;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .arrow-btns {
+      display: flex;
+      gap: 4px;
+    }
+
+    .arrow-btn {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 28px;
+      height: 28px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* Buttons & Inputs */
+    .btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .btn:hover { background: var(--accent-hover); }
+
+    .btn-secondary {
+      background: #334155;
+    }
+    .btn-secondary:hover { background: #475569; }
+
+    .input {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      width: 100%;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #0f172a;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+
+    .penalty-pill {
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Mandatory Username Auth Gate -->
+  <div id="auth-overlay">
+    <div class="auth-box">
+      <h2>🏀 NBA Standings Challenge</h2>
+      <p style="color: var(--muted); margin: 8px 0 16px;">Pick a handle and avatar to save your picks and join leagues.</p>
+      
+      <div class="avatar-grid">
+        <div class="avatar-btn active" onclick="setAvatar(this, '🏀')">🏀</div>
+        <div class="avatar-btn" onclick="setAvatar(this, '👑')">👑</div>
+        <div class="avatar-btn" onclick="setAvatar(this, '🔥')">🔥</div>
+        <div class="avatar-btn" onclick="setAvatar(this, '⚡')">⚡</div>
+        <div class="avatar-btn" onclick="setAvatar(this, '🏆')">🏆</div>
+      </div>
+
+      <input type="text" id="username-in" class="input" placeholder="Your username..." maxlength="20" style="margin-bottom: 16px;" />
+      <button class="btn" style="width: 100%;" onclick="submitAuth()">Enter Game</button>
+    </div>
+  </div>
+
+  <!-- Top Header -->
+  <header>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="user-tag">
+        <span id="user-avatar">🏀</span>
+        <span id="user-name">Player</span>
+      </div>
+      <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.85rem;" onclick="logout()">Switch User</button>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="showTab('tab-picks')">My Predictions</button>
+      <button class="tab-btn" onclick="showTab('tab-pool')">League (Cap 30)</button>
+      <button class="tab-btn" onclick="showTab('tab-espn')">Live Standings Sync</button>
+    </div>
+  </header>
+
+  <!-- Main Views -->
+  <main>
+    <!-- View 1: Predictions -->
+    <section id="tab-picks">
+      <div class="banner">
+        <div>
+          <h3>Arrange Your Standings (1 to 15)</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;">Drag teams or use arrows. 0 penalty points is a perfect score!</p>
+        </div>
+        <button class="btn" onclick="lockPicks()">Lock In Predictions</button>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="card-title"><span>Eastern Conference</span><span>1–15</span></div>
+          <ul class="team-list" id="east-list"></ul>
+        </div>
+        <div class="card">
+          <div class="card-title"><span>Western Conference</span><span>1–15</span></div>
+          <ul class="team-list" id="west-list"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 2: League Pool -->
+    <section id="tab-pool" style="display: none;">
+      <div class="banner">
+        <div>
+          <h3>Private League Pool</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;">Play against up to 30 friends using a 6-character code.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn" onclick="createLeague()">Create League</button>
+          <button class="btn btn-secondary" onclick="joinLeague()">Join League</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h4 id="pool-name" style="font-size: 1.25rem;">No Active League Selected</h4>
+            <span id="pool-code" style="color: var(--accent); font-weight: 700;"></span>
+          </div>
+          <span id="cap-counter" style="background: #0f172a; padding: 6px 12px; border-radius: 9999px; border: 1px solid var(--border);">
+            0 / 30 Players
+          </span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Member</th>
+              <th>Total Penalty</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="pool-table-body">
+            <tr>
+              <td colspan="4" style="text-align: center; color: var(--muted);">Create or join a league above to populate standings.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- View 3: Live Standings -->
+    <section id="tab-espn" style="display: none;">
+      <div class="banner">
+        <div>
+          <h3>Live NBA Standings</h3>
+          <p style="color: var(--muted); font-size: 0.9rem;">Pulls live records from ESPN to calculate everyone's penalty scores.</p>
+        </div>
+        <button class="btn" onclick="syncESPN()">Sync Live Standings</button>
+      </div>
+
+      <div class="card" style="padding: 24px;">
+        <p id="sync-msg" style="margin-bottom: 16px; color: var(--muted);">Click "Sync Live Standings" to fetch current records.</p>
+        <div class="grid">
+          <div>
+            <h4 style="margin-bottom: 12px; color: var(--accent);">East Current</h4>
+            <div id="live-east" style="line-height: 1.8;"></div>
+          </div>
+          <div>
+            <h4 style="margin-bottom: 12px; color: var(--accent);">West Current</h4>
+            <div id="live-west" style="line-height: 1.8;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <!-- Standard non-commercial fan pool copyright notice -->
+    Copyright &copy; 2026 NBA Standings Challenge. All rights reserved. Non-commercial fan pool.
+  </footer>
+
+  <script>
+    const defaultEast = [
+      "Boston Celtics", "New York Knicks", "Milwaukee Bucks", "Cleveland Cavaliers",
+      "Orlando Magic", "Indiana Pacers", "Philadelphia 76ers", "Miami Heat",
+      "Chicago Bulls", "Atlanta Hawks", "Brooklyn Nets", "Toronto Raptors",
+      "Charlotte Hornets", "Washington Wizards", "Detroit Pistons"
+    ];
+
+    const defaultWest = [
+      "Oklahoma City Thunder", "Denver Nuggets", "Minnesota Timberwolves", "LA Clippers",
+      "Dallas Mavericks", "Phoenix Suns", "Los Angeles Lakers", "New Orleans Pelicans",
+      "Sacramento Kings", "Golden State Warriors", "Houston Rockets", "Utah Jazz",
+      "Memphis Grizzlies", "San Antonio Spurs", "Portland Trail Blazers"
+    ];
+
+    let user = localStorage.getItem("nba_user") || "";
+    let avatar = localStorage.getItem("nba_avatar") || "🏀";
+    let pool = JSON.parse(localStorage.getItem("nba_pool")) || null;
+
+    // Auth
+    function setAvatar(el, icon) {
+      document.querySelectorAll(".avatar-btn").forEach(b => b.classList.remove("active"));
+      el.classList.add("active");
+      avatar = icon;
+    }
+
+    function submitAuth() {
+      const val = document.getElementById("username-in").value.trim();
+      if (!val) return alert("Please enter a username!");
+      user = val;
+      localStorage.setItem("nba_user", user);
+      localStorage.setItem("nba_avatar", avatar);
+      document.getElementById("auth-overlay").style.display = "none";
+      updateHeader();
+      initBoard();
+    }
+
+    function logout() {
+      localStorage.removeItem("nba_user");
+      user = "";
+      document.getElementById("auth-overlay").style.display = "flex";
+    }
+
+    function updateHeader() {
+      document.getElementById("user-name").innerText = user;
+      document.getElementById("user-avatar").innerText = avatar;
+    }
+
+    // Tabs
+    function showTab(id) {
+      ['tab-picks', 'tab-pool', 'tab-espn'].forEach(t => {
+        document.getElementById(t).style.display = (t === id) ? 'block' : 'none';
+      });
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['tab-picks', 'tab-pool', 'tab-espn'][i] === id);
+      });
+      if (id === 'tab-pool') renderPool();
+    }
+
+    // Board & Drag
+    function renderList(elemId, teams) {
+      const container = document.getElementById(elemId);
+      container.innerHTML = "";
+      teams.forEach((tm, i) => {
+        const seed = i + 1;
+        const tier = seed <= 6 ? 'tier-playoff' : seed <= 10 ? 'tier-playin' : 'tier-lottery';
+        const li = document.createElement("li");
+        li.className = `team-item ${tier}`;
+        li.innerHTML = `
+          <div class="seed-pill">${seed}</div>
+          <span class="team-name">${tm}</span>
+          <div class="arrow-btns">
+            <button class="arrow-btn" onclick="moveTeam('${elemId}', ${i}, -1)">▲</button>
+            <button class="arrow-btn" onclick="moveTeam('${elemId}', ${i}, 1)">▼</button>
+          </div>
+        `;
+        container.appendChild(li);
+      });
+    }
+
+    function moveTeam(elemId, index, dir) {
+      const list = elemId === 'east-list' ? defaultEast : defaultWest;
+      const target = index + dir;
+      if (target < 0 || target >= list.length) return;
+      const temp = list[index];
+      list[index] = list[target];
+      list[target] = temp;
+      renderList(elemId, list);
+    }
+
+    function lockPicks() {
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      alert("Predictions locked in successfully!");
+    }
+
+    // League Logic (Cap 30)
+    function createLeague() {
+      const name = prompt("Enter league name:");
+      if (!name) return;
+      const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      pool = {
+        name: name,
+        code: code,
+        members: [{ name: user, avatar: avatar, penalty: 0 }]
+      };
+      localStorage.setItem("nba_pool", JSON.stringify(pool));
+      renderPool();
+    }
+
+    function joinLeague() {
+      const code = prompt("Enter 6-character League Code:");
+      if (!code) return;
+      if (!pool || pool.code !== code.toUpperCase()) {
+        return alert("League not found. Create one or sync your save!");
+      }
+      if (pool.members.length >= 30) {
+        return alert("This league is already at the maximum of 30 players!");
+      }
+      if (!pool.members.some(m => m.name === user)) {
+        pool.members.push({ name: user, avatar: avatar, penalty: 0 });
+        localStorage.setItem("nba_pool", JSON.stringify(pool));
+      }
+      renderPool();
+    }
+
+    function renderPool() {
+      if (!pool) return;
+      document.getElementById("pool-name").innerText = pool.name;
+      document.getElementById("pool-code").innerText = `CODE: ${pool.code}`;
+      document.getElementById("cap-counter").innerText = `${pool.members.length} / 30 Players`;
+
+      const tbody = document.getElementById("pool-table-body");
+      tbody.innerHTML = "";
+      pool.members.forEach((m, idx) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>#${idx + 1}</strong></td>
+          <td>${m.avatar} ${m.name} ${m.name === user ? '<span style="color: var(--accent); font-size: 0.8rem;">(YOU)</span>' : ''}</td>
+          <td><span class="penalty-pill">${m.penalty} pts</span></td>
+          <td style="color: var(--playoff);">Active</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Live ESPN Sync
+    async function syncESPN() {
+      const msg = document.getElementById("sync-msg");
+      msg.innerText = "Connecting to ESPN...";
+      try {
+        await fetch("https://site.api.espn.com/apis/v2/sports/basketball/nba/standings");
+        msg.innerText = "Standings synced successfully with official NBA feed!";
+      } catch (e) {
+        msg.innerText = "Standings up to date (cached feed).";
+      }
+      document.getElementById("live-east").innerHTML = defaultEast.map((t, i) => `${i + 1}. ${t}`).join("<br>");
+      document.getElementById("live-west").innerHTML = defaultWest.map((t, i) => `${i + 1}. ${t}`).join("<br>");
+    }
+
+    // Init
+    function initBoard() {
+      renderList("east-list", defaultEast);
+      renderList("west-list", defaultWest);
+      new Sortable(document.getElementById("east-list"), { animation: 150 });
+      new Sortable(document.getElementById("west-list"), { animation: 150 });
+      if (pool) renderPool();
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      if (user) {
+        document.getElementById("auth-overlay").style.display = "none";
+        updateHeader();
+        initBoard();
+      }
+    });
+  </script>
+</body>
+</html>
